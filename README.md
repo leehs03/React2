@@ -292,3 +292,92 @@ Next.js는 최적화를 통해 네비게이션 속도가 빠르고 반응성이 
 2-2 동적 세그먼트 없는 generateStaticParams
 동적 세그먼트는 사전 렌더링될수 있지만, generateStaticParams가 누락되어 사전 렌더링 되지 않는 경우, 해당 경로는 요청 시점에 동적 렌더링으로 대체됩니다.
 generateStaticParams를 추가하여 빌드 시점에 경로가 정적으로 생성되도록 합니다.
+
+## 26.10.07
+
+# 동적 세그먼트 없는 generateStaticParams 실습
+generateStaticParams를 쓰면 빌드 시점에 정적 HTML을 미리 생성합니다
+예저처럼 안 쓰면, 요청 할 때마다 서버에서 동적으로 처리합니다
+따라서 자주 변하지 않는 페이지는 generateStaticParams 사용을 권장합니다
+-> 정적 사이트처럼 빠르기 때문입니다
+사용자 입력,DB 조회 등이 필요한 경우는 generateStaticParams 없이 런타임 처리를 하는것이 좋습니다.
+
+# generateStaticParams를 사용하는 경우 실습
+문서의 예저처럼 generateStaticParams를 사용하는 경우의 예제입니다
+app/
+ㄴblog3/
+   ㄴpage.tsx // 블로그 목록
+   ㄴposts.tsx // 더미 데이터
+   ㄴ [slug]
+
+빌드 시점에 Next.js가 app/blog3/[slug]/page.tsx 같은 동적 라우트를 찾으면 generateStaticParams()를 실행합니다
+generateStaticParams()가 반환하는 값은 다음과 같은 형태입니다
+각 params에 대해 page.tsx를 실행하여, 정적 HTML을 생성합니다.
+
+정리하면
+-generateStaticParams() 자체는 slug 배열만 반환합니다
+-Next.js 빌드 프로세스가 이 배열을 순회하며 -> 각 slug에 대해 page.tsx 실행 -> 정적 HTML
+
+# await이 없어도 async를 붙여 두는 이유
+Next.js 13+의 App Router에서 page.tsx 같은 ServerComponent는 비동기 렌더링을 전제로 하고 있습니다.
+즉, page.tsx 안에서 데이터를 fetch하는 경우가 많기 때문에 async를 기본으로 붙여도 전혀 문제가 없습니다.
+1. 일관성 유지 : 같은 프로젝트 안에서 어떤 페이지는 async, 어떤 페이지는 일반 function이면 혼란스러울 수 있습니다.
+   -> Next.js 공식 문서도 대부분 async function으로 예시를 작성합니다.
+2. 확장성 : 지금은 더미 데이터(posts.find(...))를 쓰지만, 나중에 DB 나 API에서 데이터를 가져 올 때 await fetch(...) 같은 코드가 들어갈 수 있기 때문에, 미리 async를 붙여 두면 수정할 필요가 없습니다.
+3. React Server Component 호환성 : Server Component는 Promise를 반환할 수 있어야 하고, Next.js는 내부적으로 async 함수 패턴에 맞춰 최적화된 렌더링 파이프라인을 갖고 있어서 async가 붙어 있어도 불필요한 오버헤드가 거의 없스니다.
+
+# generateStaticParams가 없는 경우와 있는 경우 비교
+generateStaticParams가 없는 경우 Next.js는 slug 값을 빌드 타임에는 모르는 상태입니다.
+-> 따라서 slug 페이지에 접속하면 Next.js가 서버에서 요청 할 때마다 해당 페이지를 동적으로 렌더링하며, 빌드의 결과물로 HTML 파일은 생성되지 않습니다.
+
+generateStaticParams가 있는 경우 Next.js에 빌드 타입에 생성할 slug 목록을 알려줄 수 있습니다.
+-> 이 경우에는 지정한 slug에 대해서는 정적 HTML + JSON이 빌드 타임에 생성되어, 최소 접근 시 SSR이 필요 없이 미리 만들어진 페이지 제공합니다.
+
+2-3. 느린 네트워크
+네트워크가 느리거나 불안정한 경우,
+
+2-4 프리페칭 비활성화
+<Link> 컴포넌트에서 prefetch prop을 false로 설정하여 프리페치를 사용하지 않도록 선택할 수 있습니다.
+이는 대량의 링크 목록(예: 무한 스크롤 테이블)을 렌더링할 때 불필요한 리소스 사용을 방지하는 데 유용합니다.
+그러나 프리페칭을 비활성화하면 다음과 같은 단점이 있습니다.
+ㄴ 정적 라우팅은 사용자가 링크를 클릭할 때만 가져옵니다
+ㄴ 동적 라우팅은 클라이언트가 해당 경로로 이동하기 전에 서버에서 먼저 렌더링 되어야 합니다
+프리페치를 완전히 비활성화하지 않고 리소스 사용량을 줄이려면, 마우스 호버 시에만 프리페치를 사용하면 됩니다.
+이렇게 하면 뷰포트의 모든 링크가 아닌, 사용자가 방문할 가능성이 높은 경로로만 프리페치가 제한됩니다.
+
+2-5 Hydration이 완료되지 않음
+<Link>는 클라이언트 컴포넌트이기 때문에 라우팅 페이지를 프리페치하기 전에 하이드레이션해야 합니다.
+초기 방문 시 대용량 자바스크립트 번들로 인해 하이드레이션이 지연되어 프리페칭이 바로 시작되지 않을 수 있습니다.
+React는 선택적 Hydration을 통해 이를 완화하며, 다음과 같은 방법으로 이를 더 욱 개선할수 있습니다.
+@next/bundle-analyzer 플러그인을 사용하면 대규모 종속성을 제거하여, 번들 크기를 식별하고 줄일 수 있습니다.
+가능하다면 클라이언트에서 서버로 로직을 이동합니다. 자세한 내용은 서버 및 클라이언트 컴포넌트 문서를 참조하세요
+
+3.Examples - 네이티브 히스토리 API
+Next.js를 사용하면 기본 window.history.pushState 및 window.history.replaceState 메서드를 사용하여 페이지를 다시 로드하지 않고도 브라우저의 기록 스택을 업데이트할 수 있습니다.
+pushState 및 replaceState 호출은 Next.js 라우터에 통합되어 usePathname 및 useSearchParams와 동기화할 수 있습니다.
+window.history.pushState
+-이 것을 사용하여 브라우저의 기록 스택에 새 항목을 추가할 수 있습니다
+-사용자는 이전 상태로 돌아갈 수 있습니다
+-예를 들어 제품 목록을 정렬할 수 있습니다.
+
+window.histoy.replaceState
+-브라우저의 기록 스택에서 현재 항목을 바꾸려면 이 기능을 사용합니다.
+-사용자는 이전 상태로 돌아갈 수 없습니다.
+-예를 들어 애플리케이션의 *로케일(Locale)을 전환하는 경우입니다
+(locale) : 사용자의 언어, 지역, 날짜/시간 형식, 숫자 표기법 등 사용자 인터페이스에서 사용되는 다양한 설정을 정의하는 문자열
+
+# 1. server 및 client component를 언제 사용해야 하나요?
+
+client 환경과 server 환경은 서로 다른 기능을 가지고 있습니다.
+server 및 client component를 사용하면 사용하는 사례에 따라 각각의 환경에서 필요한 로직을 실행할 수 있습니다
+다음과 같은 항목이 필요한 경우에는 client component를 사용합니다
+-state 및 event handler. 예 : onClick, onChange
+-Lifecycle logic 예: useEffect
+-브라우저 전용 API. 예 localStorage, window, Navigator.geolocation, 등
+-사용자 정의 Hook
+
+다음과 같은 항목이 필요할 경우에는 server component를 사용합니다
+-서버의 데이터베이스 혹은 API에서 data를 가져오는 경우 사용합니다.
+-API key,token 및 기타 보안 데이터를 client에 노출하지 않고 사용합니다
+-브라우저로 전송 되는 javaScript의 양을 줄이고 싶을 때 사용하니다.
+-콘텐츠가 포함된 첫 번째 페인트(First Contentful Paint-FCP)를 개선하고, 콘텐츠를 client에 점진적으로 스트리밍합니다.
