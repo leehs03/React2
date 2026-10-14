@@ -381,3 +381,92 @@ server 및 client component를 사용하면 사용하는 사례에 따라 각각
 -API key,token 및 기타 보안 데이터를 client에 노출하지 않고 사용합니다
 -브라우저로 전송 되는 javaScript의 양을 줄이고 싶을 때 사용하니다.
 -콘텐츠가 포함된 첫 번째 페인트(First Contentful Paint-FCP)를 개선하고, 콘텐츠를 client에 점진적으로 스트리밍합니다.
+
+## 26.10.14
+
+# Introduction
+기본적으로 layout과 page는 server component입니다
+server에서 데이터를 가져와 UI의 일부를 렌더링할 수 있고, 선택적으로 결과를 cache한 후 client로 스트리밍할 수 있습니다
+상호작용이나 브라우저 API가 필요한 경우 client component를 사용하여 기능을 계층화 할 수 있습니다.
+
+# 1. server 및 client component를 언제 사용해야 하나요?
+client 환경과 server 환경은 서로 다른 기능을 가지고 있습니다.
+server 및 client component를 사용하면 사용하는 사례에 따라 각각의 환경에서 필요한 로직을 실행할 수 있습니다.
+
+다음과 같은 항목이 필요할 경우에는 client component를 사용합니다.
+-state 및 event handler. 예 onClick, onChange
+-Lifecycle logic. 예 useEffect
+-브라우저 전용 API. 예 localStorage, window, Navigator,geolocation 등
+-사용자 정의 Hook
+
+다음과 같은 항목이 필요할 경우에는 server component를 사용합니다.
+-서버의 데이터베이스 혹은 API에서 data를 가져오는 경우 사용합니다.
+-API key, token 및 기타 보안 데이터를 client에 노출하지 않고 사용합니다.
+-브라우저로 전송되는 JavaScript의 양을 줄이고 싶을 때 사용합니다.
+-콘텐츠가 포함된 첫 번째 페인트(First Contentful Paint-FCP)를 개선하고, 콘텐츠를 client에 점진적으로 스트리밍합니다.
+
+# Optimistic Update
+[Optimistic Update(낙관적 업데이트)]
+사용자에 의해서 이벤트(예: 좋아요 버튼 클릭)가 발생하면, 서버 응답을 가디라지 않고 클라이언트(브라우저)의 UI를 즉시 변경(업데이트)합니다.
+서버에 보낸 요청의 성공을 낙관(optimistic)한다고 가정해서 먼저 화면에 변화를 보여줍니다.
+서버에서 응답이 없으면, UI를 원래 상태로 되돌립니다.(rollback)
+네트워크 지연 동안에도 앱이 "빠르게 반응" 하도록 
+
+# Pessimistic Update
+[Pessimistic Update(비관적 업데이트)]
+이벤트가 발행하면 먼저 서버에 요청을 보내고, 서버에서 성공 응답을 받은 후에 클라이언트의 UI를 업데이트합니다.
+
+(장점)
+-서버의 응답을 기반으로 하기 때문에 데이터의 일관성이 보장
+-오류가 발생할 가능이 낮고, 잘못된 정보가 표시될 염려가 없음
+(단점)
+-사용자는 서버의 으답을 기다려야 하므로, 응답이 늦어지면 사용자 경험이 저하될 수 있음
+-특히 네트워크 지연이 발생할 경우 체감 속도가 느려짐
+
+[isLiking state의 주요 역할]
+중복 클릭 방지 : isLiking이 true인 동안은 버튼을 disabled로 만들어 중복 요청 즉 중복 낙관적 업데이트를 막는 역할을 합니다.
+UI 피드백 :로딩 상태 표시(스피너나 문구)를 위해 사용이 가능합니다.
+상태 안정화 : 서버에 요청이 끝날 때까지 추가 상태 변경을 잠시 멈추게 해서, 일관된 동작을 보장합니다.
+
+# 2.Next.js에서 server와 client component는 어떻게 작동합니까?
+2-1 server component의 작동
+next.js는 server에서 React의 API를 사용하여 렌더링을 조정합니다.
+렌더링 작업은 개별 라우팅 세그먼트 별 묶음(Chunk)으로 나뉩니다. (layout 및 page)
+
+server component는 RSC Payload(React Server Component Payload)라는 특수한 데이터 형식으로 렌더링 됩니다.
+client component 와 RSC Payload는 HTML을 미리 렌더링(prerender)하는데 사용됩니다.
+
+React Server Component Payload(RSC)란 무엇인가요?
+RSC페이로드는 렌더링된 React Server Components 트리를 직렬화하여 표현한 컴팩트한 형태입니다.
+client에서 React가 브라우저의 DOM을 업데이트하는데 사용됩니다.
+
+# RSC(RSC Payload)는 JSON인가, 바이너리인가?
+과거 : JSON 기반
+RSC 초기에는 JSON 형식의 문자열로 데이터를 전달
+
+현재 : 바이너리 형식으로 최적화
+
+왜 JSON 대신 바이너리를 쓸까?
+React는 컴포넌트 구조, props, 서버에서 생성된 UI 정보를 RSC 프로토콜로 정의하고, 이를 전송하는 것에 특화된 이진 형식을 사용합니다.
+
+어떻게 이진이 브라우저에서 처리될까?
+React가 server에서 만든 UI 트리를 바이너리 스트림으로 client에 전달합니다.
+client 측 React는 이를 해석해 UI를 재구성합니다.
+
+2-2 client component의 작동 (첫 번째 load)
+1. HTML은 사용자에게 경로(라우팅 페이지)의 비대화형(정적) 미리보기를 즉시 보여주는데 사용됩니다.
+2. RSC 페이로드는 client와 server component 트리를 조정하는데 사용됩니다.
+3. JavaScript는 client component를 hydration하고, 애플리케이션을 대화형으로 만드는 데 사용됩니다.
+
+Hydration이란 무엇인가?
+Hydration은 이벤트 핸들러를 DOM에 연결하여 정적 HTML을 인터랙티브하게 만드는 React의 프로세스입니다.
+
+2-3 후속 네비게이션
+
+# 3.Example
+
+3-1 client component 사용
+파일의 맨 위, 즉 import문 위에 "use client" 지시문을 추가하여 client component를 생성 할수있음
+"use clinet" 는 server와 client 모듈 트리 사이의 경계를 선언하는 데 사용됩니다.
+파일에 "use client"로 표시되면 해당 파일의 모든 import와 자식 component는 client 번들의 일부로 간주됩니다.
+즉, client 대상으로 하는 모든 component에 이 지시문을 추가할 필요가 없습니다.
