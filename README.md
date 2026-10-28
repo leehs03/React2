@@ -470,3 +470,18 @@ Hydration은 이벤트 핸들러를 DOM에 연결하여 정적 HTML을 인터랙
 "use clinet" 는 server와 client 모듈 트리 사이의 경계를 선언하는 데 사용됩니다.
 파일에 "use client"로 표시되면 해당 파일의 모든 import와 자식 component는 client 번들의 일부로 간주됩니다.
 즉, client 대상으로 하는 모든 component에 이 지시문을 추가할 필요가 없습니다.
+
+## 26.10.28
+
+3-2 JS bundle 크기 줄이기
+client JavaScript 번들의 크기를 줄이려면 UI의 큰 부분을 client component로 표시하는 대신 특정 대화형 component에 "use client"를 추가합니다.
+
+예를 들어, 다음 예제의 <Layout> component는 로고와 탐색 링크와 같은 정적 요소가 대부분이지만 대화형 검색창이 포함되어 있습니다.
+<Search />는 대화형이기 떄문에 client component가 되야 하지만, 나머지 layout은 server component로 유지될 수 있습니다.
+나머지 layout은 server component로 유지해야 합니다!
+
+<search />는 사용자와의 상호작용이 바로 이루어질 가능성이 있기 떄문에 Client Component로 사용하고, <Logo />는 상대적으로 중요하지 않고 이미지 등 용량이 크기때문에 Server Component로 사용하는 것이 좋다.
+
+3-3 sever에서 client component로 데이터 전달
+props를 사용하여 server component에서 client component로 데이터를 전달할 수 있습니다.
+앞에서 작성한 PostPage(/[id]/page.tsx) server component는 line28에서 client component인 LikeButton으로 likes props
