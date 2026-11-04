@@ -482,6 +482,94 @@ client JavaScript 번들의 크기를 줄이려면 UI의 큰 부분을 client co
 
 <search />는 사용자와의 상호작용이 바로 이루어질 가능성이 있기 떄문에 Client Component로 사용하고, <Logo />는 상대적으로 중요하지 않고 이미지 등 용량이 크기때문에 Server Component로 사용하는 것이 좋다.
 
+
+## 2026.11.04
+
+
 3-3 sever에서 client component로 데이터 전달
 props를 사용하여 server component에서 client component로 데이터를 전달할 수 있습니다.
-앞에서 작성한 PostPage(/[id]/page.tsx) server component는 line28에서 client component인 LikeButton으로 likes props
+앞에서 작성한 PostPage(/[id]/page.tsx) server component는 line28에서 client component인 LikeButton으로 likes props를 전달하고 있는 것을 확인할 수 있습니다.
+
+다른 방법으로는 use Hook을 사용하여 server component에서 client component로 데이터를 스트리밍할 수도 있습니다. 
+예제를 참조하세요. Fetching Data에서 소개합니다.
+
+알아두면 좋은 정보 : client component에 전달되는 Props는 React로 직렬화가 가능해야 합니다.
+
+직렬화(serialization)란 무엇인가?
+일반적으로는 메모리에 있는 복잡한 데이터를 바이트의 연속 형태로 변환하는 과정을 말합니다.
+즉, 자바스크립스의 객체나 배열처럼 구조가 있는 데이터를 파일로 저장하거나, 네트워크로 전송하기 쉽게 만드는 과정입니다.
+React나 Next.js 같은 프레임워크는 컴포넌트의 상태나 트리 구조를 서버에서 직렬화하여 클라이언트로 전송하고, 클라이언트에서 역직렬화 하는 과정을 자주 수행합니다
+
+3-4 server 및 client component 인터리빙
+인터리빙(Interleaving)은 여러 데이터 블록이나 비트를 섞어서 전송하거나 처리하여 오류 발생 시 영향을 최소화하는 기술입니다.
+특히 데이터 통신에서 버스트 오류(연속적인 오류)를 줄이고 오류 정정 코드를 효과적으로 사용하기 위해 사용됩니다.
+문서에서는 server 컴포넌트와 client 컴포넌트가 섞여서(interleaved) 동작할 때 자주 등장하는 패턴입니다.
+server component의 prop를 client component에 전달할 수 있습니다.
+이를 통해 client component 내에서 server에서 렌더링된 UI를 시각적으로 중첩할 수 있습니다.
+<ClientComponent>에 공간(slot)을 만들고 children을 끼워넣는 패턴이 일반적입니다.
+
+예를 들어, client의 state를 사용하여 표시 여부를 전환(toggle)하는 <Modal> component 안에 server에서 데이터를 가져오는 <Cart> component가 있습니다.
+그 다음 부모 server component(예 : <Page>)안에 <Modal>의 자식으로 <Cart>를 전달할 수 있습니다.
+Modal을 불러오는 곳이 Page이기 때문에 Page가 parent가 되는 것입니다.
+이 패턴에서는 모든 server component(props 포함)가 server에서 미리 렌더링됩니다.
+생성된 RSC 페이로드에는 component 트리 내에서 client component가 렌더링되어야 하는 위치에 대한 참조가 포함됩니다.
+
+# sever 및 client component interleaving 실습
+실습전 문서의 설명을 정리하면
+-> 클라이언트 컴포넌트가 껍데기 역할을 하고, 서버 컴포넌트가 그 안의 내용(children)으로 들어오는 구조(패턴)를 설명하는 것입니다.
+
+jsonplaceholder.typicode.com은 아주 유명한 사이트입니다.
+
+interleaving 패턴을 사용할 라우팅 페이지를 직접 구성해 보세요
+1. page는 일반적인 라우팅 페이지와 동일합니다.
+2. 작성한 두개의 컴포넌트를 적당히 섞어서 rendering 합니다.
+
+마지막으로 네비게이션에 page link를 추가하세요
+
+동작과정
+1.Next.js는 먼저 ServerContent를 서버에서 렌더링 -> HTML로 변환
+2.이 HTML을 ClientLayout의 {children} 자리에 "끼워 넣음"
+3. 그 다음 클라이언트에서는 ClientLayout만 hydration(즉 , JS 연결)
+4. 결국 서버 데이터는 이미 들어와 있고, 버튼이나 이벤트 등은 클라이언트 컴포넌트에서 처리가 가능해 집니다
+-> 이렇게 둘이 섞여(interleaved) 있는 패턴인 되는 것입니다.
+
+# Context란 무엇인가?
+3-5. Context provider 입니다
+React에서도 나온 개념이지만, 문서를 보기 전에 먼저 context에 대해서 알아 보겠습니다.
+
+Next.js에서 Context는 React의 Context API를 사용하여 컴포넌트 사이에 데이터를 공유하는 메커니즘을 의미합니다
+즉, 부모 컴포넌트에서 자식 컴포넌트로 직접 props를 전달하지 않고도, 특정 데이터를 필요한 컴포넌트에서 쉽게 접근하고 사용할 수 있도록 도와줍니다.
+
+[ Context의 주요 특징 ]
+전역 상태 관리
+-Context를 사용하면 애플리케이션 전체에서 공유해야 하는 데이터를 중앙 집중적으로 관리할 수 있습니다. (예: 사용자 정보, 테미 설정 등)
+
+props drilling 문제 해결
+-컴포넌트 트리가 깊어질수록 props를 계속 전달해야 하는 번거로움을 줄여줍니다
+-Context를 사용하면 필요한 컴포넌트에서 바로 데이터를 가져올 수 있으므로, 코드의 가독성을 높이고 유지 보수를 용이하게 합니다.
+
+React 컴포넌트에서 사용
+-Context는 React에서 제공하는 기능이기 때문에, Next.js에서도 React 컴포넌트를 사용하여 구현합니다.
+
+[ Next.js에서 Context 사용 시 고려사항 ]
+
+클라이언트 컴포넌트
+: Next.js 13부터 클라이언트 컴포넌트 내에서 Context를 자유롭게 사용할 수 있습니다.
+
+서버 컴포넌트
+: 서버 컴포넌트에서는 직접 Context를 생성하거나 사용할 수 없지만, 클라이언트 컴포넌트로 데이터를 전달하여 간접적으로 사용할 수 있습니다
+
+성능
+: Context를 과도하게 사용하면 렌더링 성능에 영향을 줄 수 있으므로, 필요한 경우에만 신중하게 사용해야 한다.
+
+MyContext는 Context 객체를 나타내고, MyContext.Provider는 MyComponent에 데이터를 제공합니다.
+'useContext(MyContext)'를 통해 MyComponent는 "Hello from Context" 값을 가져와서 렌더링합니다.
+다음은 설명을 위한 예시이며, 실습은 뒤에서 합니다.
+
+3-5 Context provider (컨텍스트 제공자)
+React Context는 일반적으로 아래 테마처럼 전역 상태를 공유하는데 사용됩니다.
+그러나 server component에서는 React Context가 지원되지 않습니다.
+
+Context를 사용하려면 children을 허용하는 client component로 만들어야 합니다.
+
+
