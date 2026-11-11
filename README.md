@@ -572,4 +572,54 @@ React Context는 일반적으로 아래 테마처럼 전역 상태를 공유하�
 
 Context를 사용하려면 children을 허용하는 client component로 만들어야 합니다.
 
+## 2026.11.11
+
+# Context provider의 실행 과정 리뷰
+1. Context 생성 (theme-provider.tsx)
+   createContext(...)로 Context 객체를 만듭니다
+   : 초기값(default value)은 provider가 없을 떄 사용할 fallback값 입니다.
+   (여기선 theme: 'light', toggleTheme: () => {})
+
+2. Provider 배치 (RootLayout)
+   RootLayout에서 ThemeProvider로 루트(또는 필요한 하위 트리)를 감싸줍니다
+
+3. Consumer 사용 ( theme-status.tsx)
+   ThemeStatus는 'use client'로 클라이언트 컴포넌트이며, useContext(ThemeContext)를 사용해 value를 읽어 들입니다
+
+
+# Context provider의 동작 순서
+동작 순서 (버튼 클릭 시 흐름)
+1. 사용자가 ThemeStatus의 버튼 클릭
+2. toggleTheme() 호출 (ThemeStatus가 Provider의 함수를 호출)
+3. Provider 내부의 setTheme이 실행되어 theme 상태가 변경
+4. 상태 변경으로 Provider와 그 하위 컴포넌트들이 리렌더링되어 theme값이 최신으로 반영됨
+5. useEffect가 실행되어 document.documentElement.dataset.theme 값도 갱신. (글로벌 스타일 변경)
+
+# Context Provider 순서도 형식 정리
+1. 앱 시작 / RootLayout 렌더
+   RootLayout이 렌더되고, ThemeProvider로 children을 감쌈
+2. Context 생성 (초기화)
+   ThemeContext = createContext(...)가 정의되어 있음(기본값 제공)
+3. Provider 인스턴스 생성
+   ThemeProvider 컴포넌트가 실행되어 내부 state(theme, setTheme) 생성(useState).
+   Provider의 value = { theme, toggleTheme } 로 설정
+4.
+5.
+6.
+7.
+8. 부수효과 실행(useEffect)
+9. 리렌더링 전파
+10. 결과 : 레이아웃/스타일변경
+
+
+# 3-6 외부(서드 파티) component
+client 전용 기능에 의존하는 외부 component를 사용하는 경우, 해당 component를 client component에 래핑하여 예상대로 작동하는지 확인할 수 있습니다.
+예를 들어, <Carousle />은 acme-carousel 패키지에서 를 가져올 수 있습니다
+이 component는 useState를 사용하지만 "use client" 지시문은 없습니다.
+"use client" 지시문 없이 어떻게 사용할 수 있을까요?
+client component 내에서 <Carousel />을 사용하면 예상대로 작동합니다.
+그러나 sever component 내에서 직접 사용하려고 하면 오류가 발생합니다.
+이는 Next.js가 <Carousel />이 client 전용 기능을 사용하고 있다는 것을 알지 못하기 때문입니다.
+이 문제를 해결하려면 client 전용 기능에 의존하는 외부 component를 자체 client component로 래핑할 수 있습니다.
+이제 server component 내에서 <Carousel />을 직접 사용할 수 있습니다.
 
