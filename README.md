@@ -612,6 +612,8 @@ Context를 사용하려면 children을 허용하는 client component로 만들�
 10. 결과 : 레이아웃/스타일변경
 
 
+## 2026.11.18
+
 # 3-6 외부(서드 파티) component
 client 전용 기능에 의존하는 외부 component를 사용하는 경우, 해당 component를 client component에 래핑하여 예상대로 작동하는지 확인할 수 있습니다.
 예를 들어, <Carousle />은 acme-carousel 패키지에서 를 가져올 수 있습니다
@@ -622,4 +624,47 @@ client component 내에서 <Carousel />을 사용하면 예상대로 작동합�
 이는 Next.js가 <Carousel />이 client 전용 기능을 사용하고 있다는 것을 알지 못하기 때문입니다.
 이 문제를 해결하려면 client 전용 기능에 의존하는 외부 component를 자체 client component로 래핑할 수 있습니다.
 이제 server component 내에서 <Carousel />을 직접 사용할 수 있습니다.
+
+[라이브러리 작성자를 위한 조언]
+component 라이브러리를 빌드하는 경우, client 전용 기능에 의존하는 진입점에 "use client" 지시문을 추가합니다.
+이렇게 하면 사용자가 래퍼를 만들 필요 없이 component를 server component로 가져올 수 있습니다.
+일부 번들러는 "use client" 지시어를 제거할 수 있습니다.
+
+React Wrap Balancer 및 Vercel Analytics 저장소에서 "use client" 지시어를 포함하도록 esbuild를 구성하는 방법의 예를 확인할 수 있습니다.
+
+# 3-7 환경 변수 노출 예방
+Next.js는 server-only 및 client-only 모듈 import를 내부적으로 처리하여, 모듈이 잘못된 환경에서 사용될 경우 더 명확한 오류 메시지를 제공합니다.
+PM에서 제공하는 관련 패키지의 내용은 Next.js에서 사용되지 않습니다.
+
+# Fetching Data
+
+# 1.Fetching Data (데이터 가져오기) > 1-1. 서버 컴포넌트
+1-1. 서버 컴포넌트
+서버 컴포넌트에서 데이터를 fetch하는 방법은 두 가지가 있습니다.
+1.fetch API
+2.ORM 또는 데이터베이스
+
+[1.fetch API 사용]
+데이터를 가져오려면 fetch API를 사용하여 컴포넌트를 비동기식 함수로 변환하고 다음 fetch의 호출을 기다립니다.
+
+[알아두면 좋은 정보]
+fetch 응답은 기본적으로 캐싱되지 않습니다.
+그러나 Next.js는 라우팅 페이지를 미리 렌더링 하고, 성능 향상을 위해 출력은 캐싱됩니다.
+
+[2.ORM 또는 데이터베이스를 사용]
+서버 컴포넌트는 서버에서 렌더링 되기 때문에 ORM이나 데이터베이스 클라이언트를 사용해서 안전하게 데이터베이스 쿼리를 실행할 수 있습니다.
+컴포넌트를 비동기 함수로 변환하고 호출을 기다리면 됩니다.
+
+# 1.Fetching Data (데이터 가져오기) > 1-2. 클라이언트 컴포넌트
+1-2. 클라이언트 컴포넌트
+클라이언트 컴포넌트에서 데이터를 fetch하는 방법은 두가지가 있습니다.
+1. React의 use Hook
+2. SWR 또는 React 쿼리와 같은 통신 라이브러리
+
+[1.use Hook을 사용한 스트리밍 데이터]
+React의 use Hook을 사용하여 서버에서 클라이언트로 데이터를 스트리밍합니다.
+서버 컴포넌트에서 데이터를 먼저 fetch하고, 그 결과(promise)를 클라이언트 컴포넌트에 prop으로 전달합니다.
+서버 컴포넌트는 async가 가능하기 때문에 await fetch()도 사용 가능합니다.
+하지만 클라이언트 컴포넌트에서는 async가 불가능하기 때문에 직접 fetch가 불가능 합니다. (렌더링 중 fetch 금지)
+이런 이유 때문에 서버에서 fetch한 결과를 prop으로 넘기고, 클라이언트에서는 use(promise)를 써서 데이터를 가져옵니다.
 
